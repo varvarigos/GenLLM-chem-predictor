@@ -1,0 +1,79 @@
+hydra:
+    job:
+      chdir: True
+    run:
+      dir: "outputs/${now:%Y-%m-%d__%H-%M-%S}/"
+
+_target_: config.Config
+
+wandb:
+  _target_: config.WandbConfig
+  project: "gnn-llm-chem"
+  name: "gnn-llm-training"
+
+train:
+  _target_: config.TrainerConfig
+  epochs: 150
+  model_dir: "model_weights"
+
+lr_scheduler:
+  _target_: config.LRSchedulerConfig
+  name: "linear"
+  warmup_steps: 0
+
+llm:
+  _target_: config.LLMConfig
+  train: True
+  model_name: "meta-llama/Llama-3.2-1B"
+  use_context_prompt: True
+  lr: 1e-4
+  lora_rank: 8
+  lora_alpha: 32
+  lora_dropout: 0.1
+  lora_target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+
+inference:
+  _target_: config.InferenceConfig
+  max_length: 256
+  max_new_tokens: 20
+  repetition_penalty: 2.5
+  temperature: 0.5
+  top_p: 0.95
+  top_k: 50
+
+projector:
+  _target_: config.ProjectorConfig
+  lr: 1e-3
+  pretrained_weights_dir: null
+  train: True
+
+gnn:
+  _target_: config.GNNConfig
+  hidden_dim: 64
+  out_channels: 1024
+  attn_heads: 4
+  dropout: 0.1
+  lr: 1e-3
+  pretrained_weights_dir:  null
+  train: True
+
+dataset:
+  _target_: config.DatasetConfig
+  path: /home/andreas/DL_CW/AIDS/data
+
+dataloader:
+  _target_: config.DataLoaderConfig
+  train_batch_size: 50 # use 72 if use_context_prompt = False
+  val_batch_size: 50   # use 72 if use_context_prompt = False
+  num_workers: 4
+  pin_memory: True
+
+interface:
+  _target_: config.InterfaceConfig
+  llm_path: /home/andreas/DL_CW/outputs/2025-05-04__16-42-01/model_weights/ep4/llm_model/
+  gnn_path: /home/andreas/DL_CW/outputs/2025-05-04__16-42-01/model_weights/ep4/gnn_model/
+  projector_path: /home/andreas/DL_CW/outputs/2025-05-04__16-42-01/model_weights/ep4/projector_model/
