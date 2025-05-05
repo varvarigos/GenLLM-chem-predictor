@@ -1,8 +1,3 @@
-import os
-
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-
 import torch
 from torch_geometric.loader import DataLoader as GeoDataLoader
 from peft import LoraConfig, get_peft_model
