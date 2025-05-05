@@ -82,16 +82,14 @@ def main(cfg: Config):
         data = data.to(device)
         data.batch = torch.zeros(data.x.size(0), dtype=torch.long, device=device)
 
-        # === GNN Embedding ===
         graph_embeddings = gnn(
             data.x,
             data.edge_index,
             data.edge_attr,
             batch=data.batch
-        ).unsqueeze(0).to(torch.float32)  # [1, 1, D]
+        ).unsqueeze(0).to(torch.float32)
         graph_embeddings = projector(graph_embeddings).to(torch.float16)
 
-        # === Prompt Construction ===
         if cfg.llm.use_context_prompt:
             context_list = context_metrics(data)
             context = context_list[0]
@@ -103,47 +101,31 @@ def main(cfg: Config):
                 f"- The most common atom type is {context['most_common_atom']}.\n"
                 f"- The fraction of single bonds is {context['frac_single']:.2f}, "
                 f"double bonds {context['frac_double']:.2f}, and triple bonds {context['frac_triple']:.2f}.\n"
-                f"Please give me the {task_name.lower()} of this chemical compound.\nAnswer:\n{tokenizer.eos_token}"
+                f"Please give me the {task_name.lower()} of this chemical compound.\nAnswer:\n"
             )
         else:
             prompt = (
                 f"{tokenizer.bos_token}<|GRAPH_START|><|GRAPH_EMBEDDING|><|GRAPH_END|>"
-                f"Given this graph representation of a chemical compound, please give me its {task_name.lower()}.\nAnswer:\n{tokenizer.eos_token}"
+                f"Given this graph representation of a chemical compound, please give me its {task_name.lower()}.\nAnswer:\n"
             )
 
-        input_ids = tokenizer(
-            prompt,
-            return_tensors="pt",
-            padding=True,
-            truncation=True
-        ).input_ids.to(device)
+        input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
         input_embeds = llm.get_input_embeddings()(input_ids).to(torch.float16)
 
-        # === Token IDs for special tokens ===
         graph_embed_id = tokenizer.convert_tokens_to_ids('<|GRAPH_EMBEDDING|>')
-
-        # === Replace only <|GRAPH_EMBEDDING|> with the real graph embedding ===
         graph_embed_pos = (input_ids == graph_embed_id).nonzero(as_tuple=True)[1].item()
         input_embeds[0, graph_embed_pos, :] = graph_embeddings[0, 0, :]
 
-        # === Attention and Positional Embeddings ===
         attention_mask = (input_ids != tokenizer.pad_token_id).long().to(device)
         position_ids = torch.arange(input_embeds.size(1), device=device).unsqueeze(0)
 
         with torch.no_grad():
-            max_new = cfg.inference.max_new_tokens
-            B, L, D = input_embeds.shape
-            padded_input_embeds = torch.cat([
-                input_embeds,
-                torch.zeros((B, max_new, D), dtype=input_embeds.dtype, device=input_embeds.device)
-            ], dim=1)
-
             outputs = llm.generate(
-                inputs_embeds=padded_input_embeds[:, :L, :],  # Only feed prompt initially
+                inputs_embeds=input_embeds,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
                 pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
-                max_new_tokens=max_new,
+                max_new_tokens=cfg.inference.max_new_tokens,
                 repetition_penalty=cfg.inference.repetition_penalty,
                 temperature=cfg.inference.temperature,
                 top_p=cfg.inference.top_p,
@@ -160,6 +142,7 @@ def main(cfg: Config):
             print(f"Error finding real label: {e}")
 
         return output_text
+
 
     # === Gradio Interface
     with gr.Blocks() as demo:
