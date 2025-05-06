@@ -47,6 +47,34 @@ Then visit http://127.0.0.1:7880 to access the interface.
 * The interface currently supports **task selection and graph upload** via `.gxf` files.
 * **Free-form Q\&A is not yet supported in the UI**, but the underlying fine-tuned model can be used independently for open-ended questions about molecular graphs.
 
+## 📦 Required Dependencies
+
+All dependencies are listed in `requirements.txt`. Key packages include:
+
+* `torch==2.4.1`
+* `torch-geometric==2.6.1`
+* `transformers==4.46.3`
+* `peft==0.13.2`
+* `rdkit==2024.3.2`
+* `bitsandbytes==0.42.0`
+* `hydra-core==1.3.2`
+* `omegaconf==2.3.0`
+* `gradio==4.44.1`
+* `accelerate==1.0.1`
+* `wandb==0.19.9`
+* `scipy==1.10.1`
+* `scikit-learn==1.3.2`
+* `regex==2024.11.6`
+* `numpy==1.24.4`
+* `tqdm==4.67.1`
+* `lxml==5.3.2`
+* `wheel==0.45.1`
+
+You can install them all with:
+
+```bash
+pip install -r requirements.txt
+```
 
 ## 📁 Datasets and Models
 
