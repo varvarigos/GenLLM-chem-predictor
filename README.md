@@ -36,23 +36,6 @@ python3 UI/interface.py
 * The interface currently supports **task selection and graph upload** via `.gxf` files.
 * **Free-form Q\&A is not yet supported in the UI**, but the underlying fine-tuned model can be used independently for open-ended questions about molecular graphs.
 
-## 📦 Dependencies
-
-Key Python packages (see `requirements.txt`) include:
-
-* `transformers`
-* `torch`
-* `networkx`
-* `rdkit`
-* `datasets`
-* `peft`
-* `tqdm`
-
-Install them all with:
-
-```bash
-pip install -r requirements.txt
-```
 
 ## 📁 Datasets and Models
 
