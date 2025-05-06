@@ -35,7 +35,7 @@ This will load the configured dataset, fine-tune the LLM using LoRA, and produce
 
 ## 🧪 User Interface (Optional)
 
-An interface for testing the model is provided, created using Gradio:
+An interface for testing the model is provided, created using Gradio. To use it, provide the model path weights in `configs/config.yaml` and run:
 
 ```bash
 python3.11 UI/interface.py
