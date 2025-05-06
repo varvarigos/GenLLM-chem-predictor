@@ -53,7 +53,12 @@ class Trainer:
     def train(self):
         self.gnn.train()
         self.projector.train()
-        self.llm.train() if self.cfg.llm.train else self.llm.eval()
+        
+        if self.cfg.llm.use_llm:
+            if self.cfg.llm.train:
+                self.llm.train()
+            else:
+                self.llm.eval()
 
         for epoch in range(self.cfg.train.epochs):
             total_loss = 0
@@ -64,67 +69,72 @@ class Trainer:
                 graph_embeddings = self.gnn(
                     batch.x, batch.edge_index, batch.edge_attr, batch.batch
                 ).unsqueeze(1).to(torch.float32)
-                graph_embeddings = self.projector(graph_embeddings).to(torch.float16)
 
-                # === Prompt Construction ===
-                if self.cfg.llm.use_context_prompt:
-                    context_batch = context_metrics(batch)
-                    prompts = [
-                        f"{self.tokenizer.bos_token}<|GRAPH_START|><|GRAPH_EMBEDDING|><|GRAPH_END|>"
-                        f"Given this graph representation and the following characteristics of a chemical compound:\n"
-                        f"- The compound has {ctx['num_nodes']} atoms and {ctx['num_edges']} bonds.\n"
-                        f"- The average atom degree is {ctx['avg_degree']:.2f}.\n"
-                        f"- The most common atom type is {ctx['most_common_atom']}.\n"
-                        f"- The fraction of single bonds is {ctx['frac_single']:.2f}, "
-                        f"double bonds {ctx['frac_double']:.2f}, and triple bonds {ctx['frac_triple']:.2f}.\n"
-                        f"Please give me the {desc.lower()} of this chemical compound.\nAnswer:\n"
-                        for ctx, desc in zip(context_batch, batch.descriptor)
-                    ]
+                if not self.cfg.llm.use_llm:
+                    preds = self.projector(graph_embeddings).squeeze(-1)
+                    loss = F.mse_loss(preds, batch.y)
                 else:
-                    prompts = [
-                        f"{self.tokenizer.bos_token}<|GRAPH_START|><|GRAPH_EMBEDDING|><|GRAPH_END|>"
-                        f"Given this graph representation of a chemical compound, please give me its {desc.lower()}.\nAnswer:\n"
-                        for desc in batch.descriptor
+                    graph_embeddings = self.projector(graph_embeddings).to(torch.float16)
+
+                    # === Prompt Construction ===
+                    if self.cfg.llm.use_context_prompt:
+                        context_batch = context_metrics(batch)
+                        prompts = [
+                            f"{self.tokenizer.bos_token}<|GRAPH_START|><|GRAPH_EMBEDDING|><|GRAPH_END|>"
+                            f"Given this graph representation and the following characteristics of a chemical compound:\n"
+                            f"- The compound has {ctx['num_nodes']} atoms and {ctx['num_edges']} bonds.\n"
+                            f"- The average atom degree is {ctx['avg_degree']:.2f}.\n"
+                            f"- The most common atom type is {ctx['most_common_atom']}.\n"
+                            f"- The fraction of single bonds is {ctx['frac_single']:.2f}, "
+                            f"double bonds {ctx['frac_double']:.2f}, and triple bonds {ctx['frac_triple']:.2f}.\n"
+                            f"Please give me the {desc.lower()} of this chemical compound.\nAnswer:\n"
+                            for ctx, desc in zip(context_batch, batch.descriptor)
+                        ]
+                    else:
+                        prompts = [
+                            f"{self.tokenizer.bos_token}<|GRAPH_START|><|GRAPH_EMBEDDING|><|GRAPH_END|>"
+                            f"Given this graph representation of a chemical compound, please give me its {desc.lower()}.\nAnswer:\n"
+                            for desc in batch.descriptor
+                        ]
+
+                    targets = [
+                        random.choice(self.target_templates).format(desc=desc.lower(), val=val.item())
+                        for desc, val in zip(batch.descriptor, batch.y)
                     ]
 
-                targets = [
-                    random.choice(self.target_templates).format(desc=desc.lower(), val=val.item())
-                    for desc, val in zip(batch.descriptor, batch.y)
-                ]
+                    # Tokenize prompts and targets
+                    prompt_inputs = self.tokenizer(prompts, return_tensors="pt", padding=True, truncation=True).to(self.device)
+                    inputs = self.tokenizer([pp + tt for pp, tt in zip(prompts, targets)], return_tensors="pt", padding=True, truncation=True).to(self.device)
+                    padded_prompts_inputs = F.pad(prompt_inputs.input_ids, (0, inputs.input_ids.shape[1] - prompt_inputs.input_ids.shape[1]), value=self.tokenizer.pad_token_id)
 
-                # Tokenize prompts and targets
-                prompt_inputs = self.tokenizer(prompts, return_tensors="pt", padding=True, truncation=True).to(self.device)
-                inputs = self.tokenizer([pp + tt for pp, tt in zip(prompts, targets)], return_tensors="pt", padding=True, truncation=True).to(self.device)
-                padded_prompts_inputs = F.pad(prompt_inputs.input_ids, (0, inputs.input_ids.shape[1] - prompt_inputs.input_ids.shape[1]), value=self.tokenizer.pad_token_id)
+                    target_ids = inputs.input_ids.clone()
+                    target_ids[torch.logical_and(target_ids != self.tokenizer.pad_token_id, padded_prompts_inputs==target_ids)] = -100
 
-                target_ids = inputs.input_ids.clone()
-                target_ids[torch.logical_and(target_ids != self.tokenizer.pad_token_id, padded_prompts_inputs==target_ids)] = -100
+                    input_ids = inputs.input_ids.to(self.device)
+                    attention_mask = inputs.attention_mask.to(self.device)
 
-                input_ids = inputs.input_ids.to(self.device)
-                attention_mask = inputs.attention_mask.to(self.device)
+                    # Obtain input embeddings for prompts
+                    input_embeds = self.llm.get_input_embeddings()(input_ids).to(torch.float16)
 
-                # Obtain input embeddings for prompts
-                input_embeds = self.llm.get_input_embeddings()(input_ids).to(torch.float16)
+                    # Replace <|GRAPH_EMBEDDING|> token embeddings with actual graph embeddings
+                    graph_embed_id = self.tokenizer.convert_tokens_to_ids('<|GRAPH_EMBEDDING|>')
+                    for b in range(input_embeds.size(0)):
+                        graph_embed_pos = (input_ids[b] == graph_embed_id).nonzero(as_tuple=True)[0].item()
+                        input_embeds[b, graph_embed_pos, :] = graph_embeddings[b, 0, :]
 
-                # Replace <|GRAPH_EMBEDDING|> token embeddings with actual graph embeddings
-                graph_embed_id = self.tokenizer.convert_tokens_to_ids('<|GRAPH_EMBEDDING|>')
-                for b in range(input_embeds.size(0)):
-                    graph_embed_pos = (input_ids[b] == graph_embed_id).nonzero(as_tuple=True)[0].item()
-                    input_embeds[b, graph_embed_pos, :] = graph_embeddings[b, 0, :]
+                    # Generate position IDs
+                    position_ids = torch.arange(input_embeds.size(1), device=self.device).unsqueeze(0).expand(input_embeds.size(0), -1)
 
-                # Generate position IDs
-                position_ids = torch.arange(input_embeds.size(1), device=self.device).unsqueeze(0).expand(input_embeds.size(0), -1)
+                    # Forward pass through the model
+                    outputs = self.llm(
+                        inputs_embeds=input_embeds,
+                        attention_mask=attention_mask,
+                        labels=target_ids,
+                        position_ids=position_ids,
+                        use_cache=False
+                    )
 
-                # Forward pass through the model
-                outputs = self.llm(
-                    inputs_embeds=input_embeds,
-                    attention_mask=attention_mask,
-                    labels=target_ids,
-                    position_ids=position_ids,
-                    use_cache=False
-                )
-
-                loss = outputs.loss
+                    loss = outputs.loss
 
                 total_loss += loss.item()
 
@@ -161,7 +171,8 @@ class Trainer:
     def test(self):
         self.gnn.eval()
         self.projector.eval()
-        self.llm.eval()
+        if self.cfg.llm.use_llm:
+            self.llm.eval()
 
         total_loss = 0
         mse_sum = 0
@@ -175,6 +186,23 @@ class Trainer:
             graph_embeddings = self.gnn(
                 batch.x, batch.edge_index, batch.edge_attr, batch.batch
             ).unsqueeze(1).to(torch.float32)
+
+            if not self.cfg.llm.use_llm:
+                preds = self.projector(graph_embeddings).squeeze(-1)
+                loss = F.mse_loss(preds, batch.y)
+                total_loss += loss.item()
+
+                for pred_val, true_val in zip(preds.tolist(), batch.y.tolist()):
+                    total_preds += 1
+                    denom = max(abs(true_val), 1e-4)
+                    perc_diff = abs(pred_val - true_val) / denom
+
+                    mse_sum += perc_diff ** 2
+                    mae_sum += perc_diff
+
+                    valid_preds += 1
+                continue
+
             graph_embeddings = self.projector(graph_embeddings).to(torch.float16)
 
             # Build prompts
@@ -249,12 +277,18 @@ class Trainer:
             generated_texts = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
             for pred_str, true_val in zip(generated_texts, batch.y):
                 total_preds += 1
-                match = re.search(r"[-+]?[0-9]*\.?[0-9]+", pred_str)
+                match = re.search(r"\b[-+]?[0-9]*\.?[0-9]+\b", pred_str)
                 if match:
                     pred_val = float(match.group())
                     true_val = true_val.item()
-                    mse_sum += (pred_val - true_val) ** 2
-                    mae_sum += abs(pred_val - true_val)
+
+                    epsilon = 1e-4
+                    denom = max(abs(true_val), epsilon)
+                    perc_diff = abs(pred_val - true_val) / denom
+
+                    mse_sum += perc_diff ** 2
+                    mae_sum += perc_diff
+
                     valid_preds += 1
 
         avg_loss = total_loss / len(self.test_loader)
@@ -272,9 +306,8 @@ class Trainer:
 
         self.gnn.train()
         self.projector.train()
-        if self.cfg.llm.train:
-            self.llm.train()
-        else:
-            self.llm.eval()
+        if self.cfg.llm.use_llm:
+            if self.cfg.llm.train:
+                self.llm.train()
 
         return avg_loss, mse, mae, valid_pct
