@@ -13,8 +13,8 @@ cd ./GenLLM-chem-predictor
 
 # Create a virtual environment
 python3.11 -m venv env
-source litbench/bin/activate  # On macOS/Linux
-litbench\Scripts\activate  # On Windows
+source env/bin/activate  # On macOS/Linux
+env\Scripts\activate  # On Windows
 
 # Install dependencies
 pip install -r requirements.txt
