@@ -32,6 +32,7 @@ An interface for testing the model is provided, created using Gradio:
 ```bash
 python3 UI/interface.py
 ```
+Then visit http://127.0.0.1:7880 to access the interface.
 
 **Note:**
 
