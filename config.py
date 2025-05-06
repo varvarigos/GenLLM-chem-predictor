@@ -24,7 +24,7 @@ class LRSchedulerConfig:
 
 @dataclass
 class LLMConfig:
-    use_llm: bool = False
+    use_llm: bool = True
     train: bool = True
     model_name: str = "meta-llama/Llama-3.2-1B"
     use_context_prompt: bool = True
