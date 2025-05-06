@@ -81,7 +81,7 @@ class DataLoaderConfig:
 
 @dataclass
 class DatasetConfig:
-    path: Path = Path("./AIDS/data")
+    path: Path = Path("AIDS/data")
   
     def __post_init__(self):
         self.path = Path(self.path)
