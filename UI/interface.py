@@ -133,6 +133,13 @@ def main(cfg: Config):
 
         output_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
+        try:
+            descriptor_idx = descriptor_names.index(task_name)
+            real_value = data.y[descriptor_idx].item()
+            print(f"\U0001F50E Real value for '{task_name}': {real_value:.2f}")
+        except Exception as e:
+            print(f"Error finding real label: {e}")
+
         return output_text
 
 
