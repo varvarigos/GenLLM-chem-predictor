@@ -161,8 +161,9 @@ class Trainer:
 
                 torch.save(self.gnn.state_dict(), os.path.join(gnn_dir, "model.pth"))
                 torch.save(self.projector.state_dict(), os.path.join(projector_dir, "model.pth"))
-                if self.cfg.llm.train:
-                    self.llm.save_pretrained(llm_dir)
+                if self.cfg.llm.use_llm:
+                    if self.cfg.llm.train:
+                        self.llm.save_pretrained(llm_dir)
 
                 self.test()
 
@@ -192,15 +193,13 @@ class Trainer:
                 loss = F.mse_loss(preds, batch.y)
                 total_loss += loss.item()
 
-                for pred_val, true_val in zip(preds.tolist(), batch.y.tolist()):
-                    total_preds += 1
-                    denom = max(abs(true_val), 1e-4)
-                    perc_diff = abs(pred_val - true_val) / denom
-
-                    mse_sum += perc_diff ** 2
-                    mae_sum += perc_diff
-
+                for pred_val, true_val in zip(preds.view(-1).tolist(), batch.y.view(-1).tolist()):
+                    error = pred_val - true_val
+                    mse_sum += error ** 2
+                    mae_sum += abs(error)
                     valid_preds += 1
+                    total_preds += 1
+
                 continue
 
             graph_embeddings = self.projector(graph_embeddings).to(torch.float16)
@@ -282,13 +281,9 @@ class Trainer:
                     pred_val = float(match.group())
                     true_val = true_val.item()
 
-                    epsilon = 1e-4
-                    denom = max(abs(true_val), epsilon)
-                    perc_diff = abs(pred_val - true_val) / denom
-
-                    mse_sum += perc_diff ** 2
-                    mae_sum += perc_diff
-
+                    error = pred_val - true_val
+                    mse_sum += error ** 2
+                    mae_sum += abs(error)
                     valid_preds += 1
 
         avg_loss = total_loss / len(self.test_loader)
