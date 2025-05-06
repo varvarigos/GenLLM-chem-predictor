@@ -25,7 +25,7 @@ This will load the configured dataset, fine-tune the LLM using LoRA, and produce
 
 ## 🧪 User Interface (Optional)
 
-A minimal interface for testing the model is provided:
+An interface for testing the model is provided, created using Gradio:
 
 ```bash
 python3 UI/interface.py
