@@ -15,7 +15,7 @@ pip install -r requirements.txt
 
 ## 🚀 Running the Code
 
-To train or run inference with the hybrid GNN–LLM pipeline, execute:
+To train and run validation with the hybrid GNN–LLM pipeline, execute:
 
 ```bash
 python3 main.py
