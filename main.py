@@ -20,7 +20,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def main(cfg: Config):
     cfg = instantiate(cfg)
 
-    full_dataset = AIDS_GraphDataset(cfg.dataset.path)
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    data_path = os.path.join(os.getcwd(), cfg.dataset.path)
+    full_dataset = AIDS_GraphDataset(data_path)
 
     split_idx = int(0.8 * len(full_dataset))
     train_data = expand_dataset(full_dataset[:split_idx])
