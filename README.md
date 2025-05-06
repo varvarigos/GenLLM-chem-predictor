@@ -1,7 +1,7 @@
 markdown
 # GNN–LLM for Molecular Descriptor Prediction
 
-This repository implements a hybrid architecture that combines Graph Neural Networks (GNNs) with a pretrained Large Language Model (LLM) to generate molecular property descriptors from graph-structured molecular data. It supports both training and inference, as well as a simple UI for guided predictions.
+This repository implements a hybrid architecture that combines Graph Neural Networks (GNNs) with a Large Language Model (LLM) to generate molecular property descriptors from graph-structured molecular data. It supports both training and inference, as well as a simple UI for guided predictions.
 
 ## 🔧 Setup
 
