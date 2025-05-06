@@ -4,12 +4,12 @@ This repository implements a hybrid architecture that combines Graph Neural Netw
 
 ## 🔧 Setup
 
-To install the required environment and dependencies:
+Ensure you have Python 3.11 installed before proceeding with the setup. To install the required environment and dependencies:
 
 ```bash
 git clone https://github.com/varvarigos/GenLLM-chem-predictor.git
 cd ./GenLLM-chem-predictor
-python3 -m venv env
+python3.11 -m venv env
 source env/bin/activate
 pip install -r requirements.txt
 ````
