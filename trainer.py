@@ -149,7 +149,7 @@ class Trainer:
             print(f"Epoch {epoch}: Train Loss = {avg_loss:.4f}")
             wandb.log({"train_loss_per_epoch": avg_loss, "epoch": epoch})
 
-            if epoch % 1 == 0:
+            if epoch % 5 == 0:
                 gnn_dir = os.path.join(self.cfg.train.model_dir, f"ep{epoch}", "gnn_model")
                 projector_dir = os.path.join(self.cfg.train.model_dir, f"ep{epoch}", "projector_model")
                 llm_dir = os.path.join(self.cfg.train.model_dir, f"ep{epoch}", "llm_model")
