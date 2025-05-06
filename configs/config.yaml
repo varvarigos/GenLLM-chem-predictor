@@ -64,7 +64,7 @@ gnn:
 
 dataset:
   _target_: config.DatasetConfig
-  path: ./AIDS/data
+  path: AIDS/data
 
 dataloader:
   _target_: config.DataLoaderConfig
