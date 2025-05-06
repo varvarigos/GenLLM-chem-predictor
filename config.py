@@ -26,7 +26,7 @@ class LRSchedulerConfig:
 class LLMConfig:
     use_llm: bool = True
     train: bool = True
-    model_name: str = "meta-llama/Llama-3.2-1B"
+    model_name: str = "Microsoft/Phi-1.5"
     use_context_prompt: bool = True
     lr: float = 1e-4
     lora_rank: int = 16
@@ -81,17 +81,17 @@ class DataLoaderConfig:
 
 @dataclass
 class DatasetConfig:
-    path: Path = Path("/home/andreas/DL_CW/AIDS/data")
+    path: Path = Path("./AIDS/data")
   
     def __post_init__(self):
         self.path = Path(self.path)
 
 @dataclass
 class InterfaceConfig:
-    llm_path: Path = Path("/home/andreas/DL_CW/outputs/2025-04-29__00-10-55/model_weights/ep10/llm_model")
-    gnn_path: Path = Path("/home/andreas/DL_CW/outputs/2025-04-29__00-10-55/model_weights/ep10/gnn_model")
-    projector_path: Path = Path("/home/andreas/DL_CW/outputs/2025-04-29__00-10-55/model_weights/ep10/projector_model")
-    modality_emb_path: Path = Path("/home/andreas/DL_CW/outputs/2025-04-29__00-10-55/model_weights/ep10/modality_emb_model")
+    llm_path: Path = Path("./llm_model/")
+    gnn_path: Path = Path("./gnn_model/")
+    projector_path: Path = Path("./projector_model/")
+    modality_emb_path: Path = Path("./modality_emb_model/")
 
     def __post_init__(self):
         self.llm_path = Path(self.llm_path)
