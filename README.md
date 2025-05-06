@@ -12,6 +12,9 @@ cd ./GenLLM-chem-predictor
 python3.11 -m venv env
 source env/bin/activate
 pip install -r requirements.txt
+
+# Generate token for Hugging Face and then set it up by running:
+huggingface-cli login
 ````
 
 ## 🚀 Running the Code
