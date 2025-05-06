@@ -19,7 +19,7 @@ pip install -r requirements.txt
 To train and run validation with the hybrid GNN–LLM pipeline, execute:
 
 ```bash
-python3 main.py
+python3.11 main.py
 ```
 
 This will load the configured dataset, fine-tune the LLM using LoRA, and produce predictions for molecular descriptors based on graph inputs.
@@ -29,7 +29,7 @@ This will load the configured dataset, fine-tune the LLM using LoRA, and produce
 An interface for testing the model is provided, created using Gradio:
 
 ```bash
-python3 UI/interface.py
+python3.11 UI/interface.py
 ```
 Then visit http://127.0.0.1:7880 to access the interface.
 
