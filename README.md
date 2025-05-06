@@ -7,10 +7,16 @@ This repository implements a hybrid architecture that combines Graph Neural Netw
 Ensure you have Python 3.11 installed before proceeding with the setup. To install the required environment and dependencies:
 
 ```bash
+# Clone the repository
 git clone https://github.com/varvarigos/GenLLM-chem-predictor.git
 cd ./GenLLM-chem-predictor
+
+# Create a virtual environment
 python3.11 -m venv env
-source env/bin/activate
+source litbench/bin/activate  # On macOS/Linux
+litbench\Scripts\activate  # On Windows
+
+# Install dependencies
 pip install -r requirements.txt
 
 # Generate token for Hugging Face and then set it up by running:
