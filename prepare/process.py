@@ -180,16 +180,3 @@ class AIDS_GraphDataset(InMemoryDataset):
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
-
-# === Usage ===
-if __name__ == "__main__":
-    dataset = AIDS_GraphDataset("/home/andreas/DL_CW/AIDS/data")
-    print(f"Loaded {len(dataset)} graphs")
-    
-    idx = randint(0, len(dataset) - 1)
-    print(dataset[idx])
-    print(dataset[idx].x.shape)
-    print(dataset[idx].edge_index.shape)
-    print(dataset[idx].edge_attr.shape)
-
-    print("Target y (extended descriptors):", dataset[idx].y)
