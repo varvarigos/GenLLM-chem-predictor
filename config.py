@@ -10,7 +10,7 @@ class WandbConfig:
 
 @dataclass
 class TrainerConfig:
-    epochs: int = 200
+    epochs: int = 15
     model_dir: Path = Path("./model_weights")
 
     def __post_init__(self):
@@ -24,7 +24,8 @@ class LRSchedulerConfig:
 
 @dataclass
 class LLMConfig:
-    train: bool = False
+    use_llm: bool = False
+    train: bool = True
     model_name: str = "meta-llama/Llama-3.2-1B"
     use_context_prompt: bool = True
     lr: float = 1e-4
