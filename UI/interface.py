@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -102,9 +102,7 @@ def main(cfg: Config):
             )
 
         input_ids = tokenizer.apply_chat_template(
-            [
-                {"role": "user", "content": prompt}
-            ],
+            [{"role": "user", "content": prompt}],
             tokenize=True,
             padding=True,
             truncation=True,
@@ -120,13 +118,11 @@ def main(cfg: Config):
         input_embeds[0, graph_embed_pos, :] = graph_embeddings[0, 0, :]
 
         attention_mask = input_ids.ne(tokenizer.pad_token_id).to(device, dtype=torch.long)
-        position_ids = torch.arange(input_embeds.size(1), device=device).unsqueeze(0)
 
         with torch.no_grad():
             outputs = llm.generate(
                 inputs_embeds=input_embeds,
                 attention_mask=attention_mask,
-                position_ids=position_ids,
                 pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
                 max_new_tokens=cfg.inference.max_new_tokens,
                 repetition_penalty=cfg.inference.repetition_penalty,
@@ -142,12 +138,12 @@ def main(cfg: Config):
             real_value = data.y[descriptor_idx].item()
             print(f"\U0001F50E Real value for '{task_name}': {real_value:.2f}")
         except Exception as e:
-            print(f"Error finding real label: {e}")
+            pass
 
         return output_text
 
-
-    # === Gradio Interface
+    
+    # === Gradio Interface ===
     with gr.Blocks() as demo:
         gr.Markdown("# 🧬 GenLLM Chemistry Predictor")
 
