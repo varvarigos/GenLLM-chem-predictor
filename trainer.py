@@ -80,7 +80,7 @@ class Trainer:
                     if self.cfg.llm.use_context_prompt:
                         context_batch = context_metrics(batch)
                         prompts = [
-                            f"{self.tokenizer.bos_token}<|GRAPH_START|><|GRAPH_EMBEDDING|><|GRAPH_END|>"
+                            f"<|GRAPH_START|><|GRAPH_EMBEDDING|><|GRAPH_END|>"
                             f"Given this graph representation and the following characteristics of a chemical compound:\n"
                             f"- The compound has {ctx['num_nodes']} atoms and {ctx['num_edges']} bonds.\n"
                             f"- The average atom degree is {ctx['avg_degree']:.2f}.\n"
@@ -92,7 +92,7 @@ class Trainer:
                         ]
                     else:
                         prompts = [
-                            f"{self.tokenizer.bos_token}<|GRAPH_START|><|GRAPH_EMBEDDING|><|GRAPH_END|>"
+                            f"<|GRAPH_START|><|GRAPH_EMBEDDING|><|GRAPH_END|>"
                             f"Given this graph representation of a chemical compound, please give me its {desc.lower()}.\nAnswer:\n"
                             for desc in batch.descriptor
                         ]
@@ -102,16 +102,43 @@ class Trainer:
                         for desc, val in zip(batch.descriptor, batch.y)
                     ]
 
-                    # Tokenize prompts and targets
-                    prompt_inputs = self.tokenizer(prompts, return_tensors="pt", padding=True, truncation=True).to(self.device)
-                    inputs = self.tokenizer([pp + tt for pp, tt in zip(prompts, targets)], return_tensors="pt", padding=True, truncation=True).to(self.device)
-                    padded_prompts_inputs = F.pad(prompt_inputs.input_ids, (0, inputs.input_ids.shape[1] - prompt_inputs.input_ids.shape[1]), value=self.tokenizer.pad_token_id)
+                    conversations = [
+                        [
+                            {"role": "user", "content": prompt},
+                            {"role": "assistant", "content": target}
+                         ] for prompt, target in zip(prompts, targets)
+                    ]
 
-                    target_ids = inputs.input_ids.clone()
-                    target_ids[torch.logical_and(target_ids != self.tokenizer.pad_token_id, padded_prompts_inputs==target_ids)] = -100
+                    input_ids = self.tokenizer.apply_chat_template(
+                        conversations,
+                        tokenize=True,
+                        padding=True,
+                        truncation=True,
+                        return_tensors="pt",
+                        add_generation_prompt=False,
+                        enable_thinking=False,
+                    ).to(self.device)
 
-                    input_ids = inputs.input_ids.to(self.device)
-                    attention_mask = inputs.attention_mask.to(self.device)
+                    user_only = [
+                        self.tokenizer.apply_chat_template(
+                            [{"role": "user", "content": prompt}],
+                            tokenize=True,
+                            padding=False,
+                            add_generation_prompt=True,
+                            enable_thinking=False,
+                        )
+                        for prompt in prompts
+                    ]
+                    prompt_lengths = [len(u) for u in user_only]
+
+                    # Prepare attention mask: 1 for real tokens, 0 for padding
+                    attention_mask = input_ids.ne(self.tokenizer.pad_token_id).to(self.device, dtype=torch.long)
+
+                    # Prepare target IDs
+                    # Mask out prompt tokens for loss computation
+                    target_ids = input_ids.clone()
+                    for i, prompt_len in enumerate(prompt_lengths):
+                        target_ids[i, :prompt_len] = -100  # Mask out prompt tokens
 
                     # Obtain input embeddings for prompts
                     input_embeds = self.llm.get_input_embeddings()(input_ids).to(torch.float16)
@@ -144,6 +171,7 @@ class Trainer:
                 self.scheduler.step()
 
                 wandb.log({"train_loss_per_step": loss})
+
 
             avg_loss = total_loss / len(self.train_loader)
             print(f"Epoch {epoch}: Train Loss = {avg_loss:.4f}")
@@ -225,30 +253,62 @@ class Trainer:
                     for desc in batch.descriptor
                 ]
 
-            # Ground truth (for loss)
             targets = [
                 random.choice(self.target_templates).format(desc=desc.lower(), val=val.item())
                 for desc, val in zip(batch.descriptor, batch.y)
             ]
 
-            prompt_inputs = self.tokenizer(prompts, return_tensors="pt", padding=True, truncation=True).to(self.device)
-            inputs = self.tokenizer([pp + tt for pp, tt in zip(prompts, targets)], return_tensors="pt", padding=True, truncation=True).to(self.device)
-            padded_prompts_inputs = F.pad(prompt_inputs.input_ids, (0, inputs.input_ids.shape[1] - prompt_inputs.input_ids.shape[1]), value=self.tokenizer.pad_token_id)
+            conversations = [
+                [
+                    {"role": "user", "content": prompt},
+                    {"role": "assistant", "content": target}
+                    ] for prompt, target in zip(prompts, targets)
+            ]
 
-            target_ids = inputs.input_ids.clone()
-            target_ids[torch.logical_and(target_ids != self.tokenizer.pad_token_id, padded_prompts_inputs==target_ids)] = -100
+            input_ids = self.tokenizer.apply_chat_template(
+                conversations,
+                tokenize=True,
+                padding=True,
+                truncation=True,
+                return_tensors="pt",
+                add_generation_prompt=False,
+                enable_thinking=False,
+            ).to(self.device)
 
-            input_ids = inputs.input_ids.to(self.device)
-            attention_mask = inputs.attention_mask.to(self.device)
+            user_only = [
+                self.tokenizer.apply_chat_template(
+                    [{"role": "user", "content": prompt}],
+                    tokenize=True,
+                    padding=False,
+                    add_generation_prompt=True,
+                    enable_thinking=False,
+                )
+                for prompt in prompts
+            ]
+            prompt_lengths = [len(u) for u in user_only]
 
+            # Prepare attention mask: 1 for real tokens, 0 for padding
+            attention_mask = input_ids.ne(self.tokenizer.pad_token_id).to(self.device, dtype=torch.long)
+
+            # Prepare target IDs
+            # Mask out prompt tokens for loss computation
+            target_ids = input_ids.clone()
+            for i, prompt_len in enumerate(prompt_lengths):
+                target_ids[i, :prompt_len] = -100  # Mask out prompt tokens
+
+            # Obtain input embeddings for prompts
             input_embeds = self.llm.get_input_embeddings()(input_ids).to(torch.float16)
+
+            # Replace <|GRAPH_EMBEDDING|> token embeddings with actual graph embeddings
             graph_embed_id = self.tokenizer.convert_tokens_to_ids('<|GRAPH_EMBEDDING|>')
             for b in range(input_embeds.size(0)):
                 graph_embed_pos = (input_ids[b] == graph_embed_id).nonzero(as_tuple=True)[0].item()
                 input_embeds[b, graph_embed_pos, :] = graph_embeddings[b, 0, :]
 
+            # Generate position IDs
             position_ids = torch.arange(input_embeds.size(1), device=self.device).unsqueeze(0).expand(input_embeds.size(0), -1)
 
+            # Forward pass through the model
             outputs = self.llm(
                 inputs_embeds=input_embeds,
                 attention_mask=attention_mask,
