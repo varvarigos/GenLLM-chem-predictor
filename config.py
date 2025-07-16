@@ -26,13 +26,15 @@ class LRSchedulerConfig:
 class LLMConfig:
     use_llm: bool = True
     train: bool = True
-    model_name: str = "Microsoft/Phi-1.5"
+    model_name: str = "Qwen/Qwen3-8B"
     use_context_prompt: bool = True
     lr: float = 1e-4
     lora_rank: int = 16
     lora_alpha: int = 32
     lora_dropout: float = 0.05
-    lora_target_modules: list = field(default_factory=lambda: ["q_proj", "k_proj", "v_proj", "o_proj"])
+    lora_target_modules: list = field(default_factory=lambda: [
+        "q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"
+    ])
 
 @dataclass
 class InferenceConfig:
@@ -71,11 +73,10 @@ class GNNConfig:
 
 @dataclass
 class DataLoaderConfig:
-    batch_size: int = 32
     num_workers: int = 4
     pin_memory: bool = True
-    train_batch_size: int = 72
-    val_batch_size: int = 72
+    train_batch_size: int = 4
+    val_batch_size: int = 4
     num_workers: int = 4
     pin_memory: bool = True
 
