@@ -51,12 +51,11 @@ Then visit http://127.0.0.1:7880 to access the interface.
 
 All dependencies are listed in `requirements.txt`. Key packages include:
 
-* `torch==2.4.1`
+* `torch==2.5.1`
 * `torch-geometric==2.6.1`
-* `transformers==4.46.3`
+* `transformers==4.53.2`
 * `peft==0.13.2`
 * `rdkit==2024.3.2`
-* `bitsandbytes==0.42.0`
 * `hydra-core==1.3.2`
 * `omegaconf==2.3.0`
 * `gradio==4.44.1`
