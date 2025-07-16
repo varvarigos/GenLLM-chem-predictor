@@ -25,7 +25,7 @@ llm:
   _target_: config.LLMConfig
   use_llm: True
   train: True
-  model_name: "Microsoft/Phi-1.5"
+  model_name: "Qwen/Qwen3-8B"
   use_context_prompt: True
   lr: 1e-4
   lora_rank: 8
@@ -36,6 +36,9 @@ llm:
     - k_proj
     - v_proj
     - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
 
 inference:
   _target_: config.InferenceConfig
@@ -68,8 +71,8 @@ dataset:
 
 dataloader:
   _target_: config.DataLoaderConfig
-  train_batch_size: 50
-  val_batch_size: 50
+  train_batch_size: 40
+  val_batch_size: 40
   num_workers: 4
   pin_memory: True
 
