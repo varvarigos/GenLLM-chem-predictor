@@ -1,20 +1,21 @@
 import os
 import torch
-from torch_geometric.loader import DataLoader as GeoDataLoader
-from peft import LoraConfig, get_peft_model
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, get_scheduler
 import wandb
-from prepare.process import AIDS_GraphDataset
+import hydra
+from omegaconf import OmegaConf
+from hydra.utils import instantiate
+from peft import LoraConfig, get_peft_model
+from torch_geometric.loader import DataLoader as GeoDataLoader
+from transformers import AutoTokenizer, AutoModelForCausalLM, get_scheduler
+
+from config import Config
 from models.gnn import GNN
 from trainer import Trainer
-from config import Config
-import hydra
-from hydra.utils import instantiate
-from omegaconf import OmegaConf
 from utils import expand_dataset
+from prepare.process import AIDS_GraphDataset
 
 torch.manual_seed(42)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
 def main(cfg: Config):
@@ -63,17 +64,17 @@ def main(cfg: Config):
         if not tokenizer.pad_token:
             tokenizer.pad_token = tokenizer.eos_token
         tokenizer.add_special_tokens({
-            'additional_special_tokens': ['<|GRAPH_START|>', '<|GRAPH_EMBEDDING|>', '<|GRAPH_END|>']
+            'additional_special_tokens': [
+                '<|GRAPH_START|>',
+                '<|GRAPH_EMBEDDING|>',
+                '<|GRAPH_END|>'
+            ]
         })
 
-        bnb_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            bnb_8bit_use_double_quant=True,
-            bnb_8bit_quant_type="nf8",
-            bnb_8bit_compute_dtype=torch.float16,
-        )
-
-        llm = AutoModelForCausalLM.from_pretrained(model_name, quantization_config=bnb_config, trust_remote_code=True)
+        llm = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            trust_remote_code=True
+        ).to(device)
         llm.resize_token_embeddings(len(tokenizer))
 
         if cfg.llm.train:
