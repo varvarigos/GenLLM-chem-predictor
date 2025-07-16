@@ -58,7 +58,7 @@ All dependencies are listed in `requirements.txt`. Key packages include:
 * `rdkit==2024.3.2`
 * `hydra-core==1.3.2`
 * `omegaconf==2.3.0`
-* `gradio==4.44.1`
+* `gradio==5.23.2`
 * `accelerate==1.0.1`
 * `wandb==0.19.9`
 * `scipy==1.10.1`
