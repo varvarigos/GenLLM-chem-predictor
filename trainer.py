@@ -62,7 +62,7 @@ class Trainer:
 
         for epoch in range(self.cfg.train.epochs):
             total_loss = 0
-            for batch in tqdm(self.train_loader):
+            for step, batch in enumerate(tqdm(self.train_loader)):
                 batch = batch.to(self.device, non_blocking=True)
 
                 # === GNN Embedding ===
@@ -162,6 +162,7 @@ class Trainer:
                     )
 
                     loss = outputs.loss
+
 
                 total_loss += loss.item()
 
@@ -264,7 +265,6 @@ class Trainer:
                     {"role": "assistant", "content": target}
                     ] for prompt, target in zip(prompts, targets)
             ]
-
             input_ids = self.tokenizer.apply_chat_template(
                 conversations,
                 tokenize=True,
@@ -319,11 +319,35 @@ class Trainer:
 
             total_loss += outputs.loss.item()
 
-            # Generate predictions
+            # Strip input_ids to remove answer part for generation
+            strip = torch.tensor(
+                self.tokenizer.encode("</think>\n\n", add_special_tokens=False),
+                device=input_ids.device
+            )
+            strip_len = strip.size(0)
+
+            # Unfold over sequence dimension, then match
+            matches = (input_ids.unfold(dimension=1, size=strip_len, step=1) == strip).all(dim=-1)  # [B, L - strip_len + 1]
+
+            # Get the index of the match + offset
+            offsets = torch.arange(matches.size(1), device=input_ids.device).unsqueeze(0)  # [1, L - strip_len + 1]
+            indices = torch.where(matches, offsets, torch.full_like(offsets, -1))
+            last_token_idx = indices.max(dim=1).values + strip_len  # [B]
+
+            # Keep of every batch and pad the rest on the right
+            input_embeds = torch.nn.utils.rnn.pad_sequence(
+                [input_embeds[i, :last_token_idx[i]] for i in range(input_embeds.size(0))],
+                batch_first=True,
+                padding_value=0.0,
+                padding_side='left'
+            )
+            attention_mask = torch.nn.utils.rnn.pad_sequence([
+                attention_mask[i, :last_token_idx[i]] for i in range(attention_mask.size(0))
+            ], batch_first=True, padding_value=0, padding_side='left')
+
             generated_ids = self.llm.generate(
                 inputs_embeds=input_embeds,
                 attention_mask=attention_mask,
-                position_ids=position_ids,
                 max_new_tokens=self.cfg.inference.max_new_tokens,
                 repetition_penalty=self.cfg.inference.repetition_penalty,
                 temperature=self.cfg.inference.temperature,
@@ -332,8 +356,9 @@ class Trainer:
                 pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
                 do_sample=True,
             )
+            
+            generated_texts = self.tokenizer.batch_decode(generated_ids)
 
-            generated_texts = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
             for pred_str, true_val in zip(generated_texts, batch.y):
                 total_preds += 1
                 match = re.search(r"\b[-+]?[0-9]*\.?[0-9]+\b", pred_str)
