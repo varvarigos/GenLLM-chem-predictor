@@ -71,8 +71,8 @@ dataset:
 
 dataloader:
   _target_: config.DataLoaderConfig
-  train_batch_size: 40
-  val_batch_size: 40
+  train_batch_size: 4
+  val_batch_size: 4
   num_workers: 4
   pin_memory: True
 
