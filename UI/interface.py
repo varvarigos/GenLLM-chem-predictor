@@ -3,17 +3,17 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import gradio as gr
 import torch
 import hydra
-from hydra.utils import instantiate
+import gradio as gr
 from config import Config
-from models.gnn import GNN
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
-from prepare.process import parse_gxl_file
-from utils import context_metrics
+from models.gnn import GNN
+from hydra.utils import instantiate
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from utils import context_metrics
+from prepare.process import parse_gxl_file
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -52,15 +52,8 @@ def main(cfg: Config):
     tokenizer.add_special_tokens(special_tokens_dict)
     
     # Load LLM
-    bnb_config = BitsAndBytesConfig(
-        load_in_8bit=True,
-        bnb_8bit_use_double_quant=True,
-        bnb_8bit_quant_type="nf8",
-        bnb_8bit_compute_dtype=torch.float16,
-    )
     llm = AutoModelForCausalLM.from_pretrained(
         cfg.llm.model_name,
-        quantization_config=bnb_config,
         torch_dtype=torch.float16,
         device_map="auto",
     )
@@ -93,7 +86,7 @@ def main(cfg: Config):
             context_list = context_metrics(data)
             context = context_list[0]
             prompt = (
-                f"{tokenizer.bos_token}<|GRAPH_START|><|GRAPH_EMBEDDING|><|GRAPH_END|>"
+                f"<|GRAPH_START|><|GRAPH_EMBEDDING|><|GRAPH_END|>"
                 f"Given this graph representation and the following characteristics of a chemical compound:\n"
                 f"- The compound has {context['num_nodes']} atoms and {context['num_edges']} bonds.\n"
                 f"- The average atom degree is {context['avg_degree']:.2f}.\n"
@@ -108,14 +101,25 @@ def main(cfg: Config):
                 f"Given this graph representation of a chemical compound, please give me its {task_name.lower()}.\nAnswer:\n"
             )
 
-        input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+        input_ids = tokenizer.apply_chat_template(
+            [
+                {"role": "user", "content": prompt}
+            ],
+            tokenize=True,
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+            add_generation_prompt=True,
+            enable_thinking=False,
+        ).to(device)
+
         input_embeds = llm.get_input_embeddings()(input_ids).to(torch.float16)
 
         graph_embed_id = tokenizer.convert_tokens_to_ids('<|GRAPH_EMBEDDING|>')
         graph_embed_pos = (input_ids == graph_embed_id).nonzero(as_tuple=True)[1].item()
         input_embeds[0, graph_embed_pos, :] = graph_embeddings[0, 0, :]
 
-        attention_mask = (input_ids != tokenizer.pad_token_id).long().to(device)
+        attention_mask = input_ids.ne(tokenizer.pad_token_id).to(device, dtype=torch.long)
         position_ids = torch.arange(input_embeds.size(1), device=device).unsqueeze(0)
 
         with torch.no_grad():
