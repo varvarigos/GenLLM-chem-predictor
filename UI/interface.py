@@ -111,19 +111,19 @@ def main(cfg: Config):
             enable_thinking=False,
         ).to(device)
 
-        input_embeds = llm.get_input_embeddings()(input_ids).to(torch.float16)
+        input_embeds = llm.get_input_embeddings()(input_ids).to(dtype=torch.float16, device=device)
 
         graph_embed_id = tokenizer.convert_tokens_to_ids('<|GRAPH_EMBEDDING|>')
         graph_embed_pos = (input_ids == graph_embed_id).nonzero(as_tuple=True)[1].item()
         input_embeds[0, graph_embed_pos, :] = graph_embeddings[0, 0, :]
 
-        attention_mask = input_ids.ne(tokenizer.pad_token_id).to(device, dtype=torch.long)
+        attention_mask = input_ids.ne(tokenizer.pad_token_id).to(dtype=torch.long, device=device)
 
         with torch.no_grad():
             outputs = llm.generate(
                 inputs_embeds=input_embeds,
                 attention_mask=attention_mask,
-                pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
+                pad_token_id=tokenizer.pad_token_id,
                 max_new_tokens=cfg.inference.max_new_tokens,
                 repetition_penalty=cfg.inference.repetition_penalty,
                 temperature=cfg.inference.temperature,
