@@ -1,11 +1,11 @@
-from tqdm import tqdm
+import re
+import os
 import torch
 import wandb
-import os
-from utils import context_metrics
 import random
-import re
+from tqdm import tqdm
 import torch.nn.functional as F
+from utils import context_metrics
 
 class Trainer:
     def __init__(
